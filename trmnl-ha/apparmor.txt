@@ -1,0 +1,199 @@
+#include <tunables/global>
+
+# NOTE: Remove 'complain' flag after testing to enforce restrictions
+# To check for issues after deploying, SSH into HA, then:
+# journalctl _TRANSPORT="audit" | grep 'apparmor="ALLOWED"' | grep trmnl-ha
+profile trmnl-ha flags=(attach_disconnected,mediate_deleted,complain) {
+  #include <abstractions/base>
+  #include <abstractions/nameservice>
+
+  # =============================================================================
+  # CAPABILITIES (minimal set for container operation)
+  # =============================================================================
+
+  capability chown,
+  capability dac_override,
+  capability dac_read_search,
+  capability fowner,
+  capability fsetid,
+  capability kill,
+  capability setgid,
+  capability setuid,
+  capability net_bind_service,
+  capability sys_chroot,
+
+  # =============================================================================
+  # SIGNALS
+  # =============================================================================
+
+  signal (send) set=(kill,term,int,hup,cont),
+  signal (receive),
+
+  # =============================================================================
+  # CONTAINER INIT & ENTRYPOINT
+  # =============================================================================
+
+  /usr/local/bin/docker-entrypoint.sh rix,
+  /bin/** rix,
+  /usr/bin/** rix,
+  /lib/** rm,
+  /lib64/** rm,
+  /usr/lib/** rm,
+
+  # =============================================================================
+  # BUN RUNTIME
+  # =============================================================================
+
+  /root/.bun/** rix,
+
+  # =============================================================================
+  # APPLICATION (/app)
+  # =============================================================================
+
+  /app/ r,
+  /app/** r,
+  /app/*.js rix,
+  /app/*.ts r,
+  /app/node_modules/** rm,
+  /app/node_modules/.bin/** rix,
+
+  # Logs and output directories (read/write/create)
+  /app/logs/ rw,
+  /app/logs/** rwk,
+  /app/output/ rw,
+  /app/output/** rwk,
+
+  # =============================================================================
+  # DATA PERSISTENCE (/data - mounted by HA Supervisor)
+  # =============================================================================
+
+  /data/ rw,
+  /data/** rwk,
+
+  # =============================================================================
+  # TEMPORARY FILES
+  # =============================================================================
+
+  /tmp/ rw,
+  /tmp/** rwk,
+  /var/tmp/ rw,
+  /var/tmp/** rwk,
+  /run/ rw,
+  /run/** rwk,
+  /dev/shm/ rw,
+  /dev/shm/** rwk,
+
+  # =============================================================================
+  # CHROMIUM BROWSER
+  # =============================================================================
+
+  # Chromium binaries
+  /usr/bin/chromium rix,
+  /usr/lib/chromium/ r,
+  /usr/lib/chromium/** rm,
+  /usr/lib/chromium/chromium rix,
+  /usr/lib/chromium/chrome-sandbox rix,
+
+  # Chromium needs to read /proc for sandboxing
+  @{PROC}/ r,
+  @{PROC}/** r,
+  @{PROC}/sys/kernel/random/uuid r,
+
+  # Device access
+  /dev/null rw,
+  /dev/urandom r,
+  /dev/tty rw,
+  /dev/dri/ r,
+  /dev/dri/** rw,
+  /sys/** r,
+
+  # Chromium user data and cache
+  owner /root/.config/ rw,
+  owner /root/.config/** rwk,
+  owner /root/.cache/ rw,
+  owner /root/.cache/** rwk,
+  owner /root/.local/ rw,
+  owner /root/.local/** rwk,
+  owner /root/.pki/ rw,
+  owner /root/.pki/** rwk,
+
+  # Fonts for rendering
+  /usr/share/fonts/** r,
+  /etc/fonts/** r,
+  /var/cache/fontconfig/ r,
+  /var/cache/fontconfig/** rw,
+
+  # =============================================================================
+  # GRAPHICSMAGICK
+  # =============================================================================
+
+  /usr/bin/gm rix,
+  /usr/lib/graphicsmagick*/ r,
+  /usr/lib/graphicsmagick*/** rm,
+  /etc/GraphicsMagick/ r,
+  /etc/GraphicsMagick/** r,
+  /usr/share/GraphicsMagick*/ r,
+  /usr/share/GraphicsMagick*/** r,
+
+  # =============================================================================
+  # NETWORK (allow TCP/UDP for HTTP server & webhooks)
+  # =============================================================================
+
+  network inet stream,
+  network inet6 stream,
+  network inet dgram,
+  network inet6 dgram,
+  network unix stream,
+  network unix dgram,
+
+  # =============================================================================
+  # SYSTEM FILES (read-only)
+  # =============================================================================
+
+  /etc/hosts r,
+  /etc/resolv.conf r,
+  /etc/nsswitch.conf r,
+  /etc/ssl/ r,
+  /etc/ssl/** r,
+  /etc/ca-certificates/ r,
+  /etc/ca-certificates/** r,
+  /usr/share/ca-certificates/ r,
+  /usr/share/ca-certificates/** r,
+  /etc/passwd r,
+  /etc/group r,
+  /etc/localtime r,
+  /etc/timezone r,
+  /etc/mime.types r,
+  /etc/machine-id r,
+  /etc/ld.so.cache r,
+  /etc/ld.so.preload r,
+
+  # =============================================================================
+  # EXPLICIT DENIALS (defense in depth)
+  # =============================================================================
+
+  # Deny raw/packet sockets (prevent packet sniffing)
+  deny network raw,
+  deny network packet,
+
+  # Deny mount operations
+  deny mount,
+  deny umount,
+  deny pivot_root,
+
+  # Deny ptrace (debugging other processes)
+  deny ptrace,
+
+  # Deny kernel parameter modification
+  deny @{PROC}/sys/kernel/** w,
+  deny @{PROC}/sys/net/** w,
+
+  # Deny access to Home Assistant directories
+  deny /homeassistant/** rwx,
+  deny /config/** rwx,
+  deny /ssl/** rwx,
+  deny /addons/** rwx,
+  deny /backup/** rwx,
+  deny /media/** rwx,
+  deny /share/** rwx,
+}

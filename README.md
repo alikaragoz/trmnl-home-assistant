@@ -1,19 +1,77 @@
-# Home Assistant Add-ons
+# TRMNL HA
 
-Custom add-ons for Home Assistant.
+![TRMNL Logo](trmnl-ha/logo.png)
 
-## Add-ons
-
-### [TRMNL HA](trmnl-ha/)
-
-Send dashboard screens to your TRMNL e-ink display.
+Send Home Assistant dashboard screenshots to your TRMNL e-ink display with advanced dithering optimized for e-paper screens.
 
 [![Add repository to Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fusetrmnl%2Ftrmnl-home-assistant)
 
+## Features
+
+- **E-ink optimized dithering** - Floyd-Steinberg and Ordered algorithms for crisp e-paper rendering
+- **TRMNL webhook integration** - Automatic dashboard uploads to TRMNL devices
+- **Scheduled captures** - Cron-based automation with Web UI management
+- **Device presets** - Pre-configured settings for 24+ popular e-ink displays
+- **Crash recovery** - Automatic browser recovery and process supervision
+- **High performance** - Powered by Bun runtime for fast startup and low memory
+
+## Installation
+
+1. Add this repository to Home Assistant:
+   - Go to **Settings** → **Add-ons** → **Add-on Store** → **⋮** → **Repositories**
+   - Add: `https://github.com/usetrmnl/trmnl-home-assistant`
+
+2. Install the **TRMNL HA** add-on
+
+3. Configure your access token:
+   - In Home Assistant: **Profile** → **Long-Lived Access Tokens** → **Create Token**
+   - Add to the add-on configuration
+
+4. Start the add-on and open the Web UI
+
+### Proxmox Users
+
+If running Home Assistant OS in Proxmox, set the VM host type to `host` for Chromium to work properly.
+
+## Security
+
+**Important:** This add-on is designed for trusted home networks.
+
+- The Web UI (port 10000) has **no built-in authentication**
+- **Always use Ingress** (sidebar integration) instead of direct port access
+- **Never expose port 10000** directly to the internet
+- Access tokens are stored securely in Home Assistant's add-on configuration
+
+The add-on includes an AppArmor security profile that restricts file and network access to only what's required for operation.
+
+## Documentation
+
+| Topic | Description |
+|-------|-------------|
+| [Configuration](trmnl-ha/DOCS.md#configuration) | Required and optional settings |
+| [Web UI](trmnl-ha/DOCS.md#web-ui) | Using the web interface |
+| [API Reference](trmnl-ha/DOCS.md#api-reference) | Screenshot endpoint parameters |
+| [Device Presets](trmnl-ha/DOCS.md#device-presets) | Supported e-ink displays |
+| [Scheduled Captures](trmnl-ha/DOCS.md#scheduled-captures) | Cron-based automation |
+| [Troubleshooting](trmnl-ha/DOCS.md#troubleshooting) | Common issues and fixes |
+| [Local Development](trmnl-ha/DOCS.md#local-development) | Development setup |
+
+## Attribution
+
+This project is based on the [puppet](https://github.com/balloob/home-assistant-addons/tree/main/puppet) Home Assistant add-on by [Paulus Schoutsen](https://github.com/balloob).
+
+See the [NOTICE](trmnl-ha/NOTICE) file for complete attribution and modification details.
+
 ## License
 
-Each add-on in this repository may have its own license. See the individual add-on directories for specific licensing information.
+Copyright (c) Paulus Schoutsen (original work)
+Copyright (c) 2024-2025 TRMNL (enhancements and modifications)
 
-| Add-on | License |
-|--------|---------|
-| [trmnl-ha](trmnl-ha/) | [Apache 2.0](trmnl-ha/LICENSE) |
+Licensed under the [Apache License 2.0](trmnl-ha/LICENSE)
+
+## Links
+
+- [TRMNL](https://usetrmnl.com)
+- [Documentation](trmnl-ha/DOCS.md)
+- [Changelog](trmnl-ha/CHANGELOG.md)
+- [Upstream Project (puppet)](https://github.com/balloob/home-assistant-addons)

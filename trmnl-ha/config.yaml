@@ -2,13 +2,17 @@ name: "TRMNL HA"
 description: "Send dashboard screens to your TRMNL"
 version: "0.2.1"
 slug: "trmnl-ha"
+url: "https://github.com/usetrmnl/trmnl-home-assistant"
 image: ghcr.io/usetrmnl/trmnl-ha-{arch}
+# NOTE: Uncomment after setting up Codenotary signing in CI
+# codenotary: dev@usetrmnl.com
 homeassistant_api: true
 init: false
 watchdog: "http://[HOST]:10000/health"
 arch:
   - aarch64
   - amd64
+stage: stable
 
 # Enable ingress for sidebar integration
 ingress: true
@@ -36,3 +40,8 @@ schema:
   access_token: str
   home_assistant_url: str?
   keep_browser_open: bool?
+
+# Exclude regeneratable data from HA backups
+backup_exclude:
+  - "*/logs/*"
+  - "*/output/*"
