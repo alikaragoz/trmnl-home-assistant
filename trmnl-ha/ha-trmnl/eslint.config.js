@@ -24,6 +24,11 @@ export default tseslint.config(
       },
     },
     rules: {
+      // Allow tagged template literals (LogTape logging syntax: log.info`message`)
+      '@typescript-eslint/no-unused-expressions': [
+        'error',
+        { allowTaggedTemplates: true },
+      ],
       // Unused vars with underscore prefix are allowed
       '@typescript-eslint/no-unused-vars': [
         'error',

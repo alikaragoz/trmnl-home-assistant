@@ -7,6 +7,9 @@
  */
 
 import { BrowserRecoveryFailedError } from '../error.js'
+import { browserLogger } from './logger.js'
+
+const log = browserLogger()
 
 /** Browser instance interface (from screenshot.ts) */
 export interface BrowserInstance {
@@ -97,14 +100,12 @@ export class BrowserFacade {
     let attempts = 0
     let lastError: Error | null = null
 
-    console.log('[Recovery] Starting browser recovery...')
+    log.info`Starting browser recovery...`
 
     try {
       while (attempts < BrowserFacade.MAX_RECOVERY_ATTEMPTS) {
         attempts++
-        console.log(
-          `[Recovery] Attempt ${attempts}/${BrowserFacade.MAX_RECOVERY_ATTEMPTS}`
-        )
+        log.info`Recovery attempt ${attempts}/${BrowserFacade.MAX_RECOVERY_ATTEMPTS}`
 
         try {
           await this.#browser.cleanup().catch(() => {})
@@ -113,16 +114,13 @@ export class BrowserFacade {
 
           if (!this.#browser.isConnected()) throw new Error('Not connected')
 
-          console.log(`[Recovery] Success after ${attempts} attempt(s)`)
+          log.info`Recovery success after ${attempts} attempt(s)`
           this.#recoveries++
           this.#failures = 0
           return
         } catch (err) {
           lastError = err as Error
-          console.error(
-            `[Recovery] Attempt ${attempts} failed:`,
-            lastError.message
-          )
+          log.error`Recovery attempt ${attempts} failed: ${lastError.message}`
         }
       }
       throw new BrowserRecoveryFailedError(

@@ -29,6 +29,9 @@ import type {
   GrayscalePalette,
 } from '../types/domain.js'
 import type { DitheringStrategy, DitheringMode } from '../types/dithering-strategy.js'
+import { ditheringLogger } from './logger.js'
+
+const log = ditheringLogger()
 
 // =============================================================================
 // PUBLIC CONSTANTS
@@ -228,9 +231,9 @@ async function applySimpleProcessing(
       stdout.on('data', (chunk: Buffer) => chunks.push(chunk))
       stdout.on('end', () => { resolve(Buffer.concat(chunks)); })
       stdout.on('error', reject)
-      stderr.on('data', (data: Buffer) =>
-        { console.error('IM stderr:', data.toString()); }
-      )
+      stderr.on('data', (data: Buffer) => {
+        log.warn`ImageMagick stderr: ${data.toString()}`
+      })
     })
   })
 }
@@ -276,9 +279,9 @@ export async function convertToFormat(
         }
       })
       stdout.on('error', reject)
-      stderr.on('data', (data: Buffer) =>
-        { console.error('IM stderr:', data.toString()); }
-      )
+      stderr.on('data', (data: Buffer) => {
+        log.warn`ImageMagick stderr: ${data.toString()}`
+      })
     })
   })
 }
@@ -411,7 +414,7 @@ export async function applyDithering(
       })
 
       stderr.on('data', (data: Buffer) => {
-        console.error('IM stderr:', data.toString())
+        log.warn`ImageMagick stderr: ${data.toString()}`
       })
     })
   })

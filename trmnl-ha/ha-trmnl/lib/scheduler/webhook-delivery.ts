@@ -7,11 +7,11 @@
  * @module lib/scheduler/webhook-delivery
  */
 
-import {
-  SCHEDULER_LOG_PREFIX,
-  SCHEDULER_RESPONSE_BODY_TRUNCATE_LENGTH,
-} from '../../const.js'
+import { SCHEDULER_RESPONSE_BODY_TRUNCATE_LENGTH } from '../../const.js'
 import type { ImageFormat } from '../../types/domain.js'
+import { webhookLogger } from '../logger.js'
+
+const log = webhookLogger()
 
 /** MIME type mapping */
 const CONTENT_TYPES: Record<string, string> = {
@@ -49,8 +49,7 @@ export async function uploadToWebhook(
   const { webhookUrl, webhookHeaders = {}, imageBuffer, format } = options
   const contentType = CONTENT_TYPES[format] || 'image/png'
 
-  console.log(`${SCHEDULER_LOG_PREFIX} Sending webhook to: ${webhookUrl}`)
-  console.log(`${SCHEDULER_LOG_PREFIX} Content-Type: ${contentType}, Size: ${imageBuffer.length} bytes`)
+  log.info`Sending webhook: ${webhookUrl} (${contentType}, ${imageBuffer.length} bytes)`
 
   const response = await fetch(webhookUrl, {
     method: 'POST',
@@ -59,18 +58,20 @@ export async function uploadToWebhook(
   })
 
   const responseText = await response.text()
-  console.log(`${SCHEDULER_LOG_PREFIX} Webhook response: ${response.status} ${response.statusText}`)
-
-  if (responseText) {
-    const truncated = responseText.substring(0, SCHEDULER_RESPONSE_BODY_TRUNCATE_LENGTH)
-    console.log(`${SCHEDULER_LOG_PREFIX} Response body: ${truncated}`)
-  }
 
   if (!response.ok) {
+    log.error`Webhook failed: ${response.status} ${response.statusText}`
+    if (responseText) {
+      const truncated = responseText.substring(0, SCHEDULER_RESPONSE_BODY_TRUNCATE_LENGTH)
+      log.error`Response body: ${truncated}`
+    }
     throw new Error(`HTTP ${response.status}: ${response.statusText}`)
   }
 
-  console.log(`${SCHEDULER_LOG_PREFIX} Uploaded to webhook: ${webhookUrl}`)
+  log.info`Webhook success: ${response.status} ${response.statusText}`
+  if (responseText) {
+    log.debug`Response body: ${responseText.substring(0, SCHEDULER_RESPONSE_BODY_TRUNCATE_LENGTH)}`
+  }
 
   return { success: true, status: response.status, statusText: response.statusText }
 }

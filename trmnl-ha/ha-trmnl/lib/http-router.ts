@@ -25,6 +25,9 @@ import { loadDevicesConfig, loadPresets } from '../devices.js'
 import type { BrowserFacade } from './browserFacade.js'
 import type { ScheduleInput, ScheduleUpdate } from '../types/domain.js'
 import { toJson } from './json.js'
+import { httpLogger } from './logger.js'
+
+const log = httpLogger()
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -90,9 +93,13 @@ export class HttpRouter {
   ): Promise<boolean> {
     const { pathname } = requestUrl
 
+    // Skip logging for health checks (too noisy)
     if (pathname === '/health') {
       return this.#handleHealth(response)
     }
+
+    // Log all other requests
+    log.debug`${request.method} ${pathname}`
 
     if (pathname === '/favicon.ico') {
       response.statusCode = 404
@@ -259,7 +266,7 @@ export class HttpRouter {
       response.writeHead(200)
       response.end(toJson(result))
     } catch (err) {
-      console.error('Error executing schedule manually:', err)
+      log.error`Manual schedule execution failed: ${err}`
       response.writeHead(
         (err as Error).message.includes('not found') ? 404 : 500
       )

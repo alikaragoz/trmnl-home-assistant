@@ -17,6 +17,9 @@ import type { HassConfig, Connection } from 'home-assistant-js-websocket'
 import { hassUrl, hassToken, isAddOn } from './const.js'
 import { loadDevicesConfig } from './devices.js'
 import type { PresetsConfig } from './types/domain.js'
+import { uiLogger } from './lib/logger.js'
+
+const log = uiLogger()
 
 // =============================================================================
 // CONSTANTS
@@ -117,10 +120,8 @@ function generateConfigInstructions(action: 'Configure' | 'Update'): string {
  */
 async function fetchHomeAssistantData(): Promise<HomeAssistantData> {
   try {
-    console.log(`[DEBUG] Connecting to HA at: ${hassUrl}`)
-    console.log(
-      `[DEBUG] Token configured: ${hassToken ? 'yes (' + hassToken.substring(0, 10) + '...)' : 'NO'}`
-    )
+    log.debug`Connecting to HA at: ${hassUrl}`
+    log.debug`Token configured: ${hassToken ? 'yes (' + hassToken.substring(0, 10) + '...)' : 'NO'}`
 
     const auth = createLongLivedTokenAuth(hassUrl, hassToken!)
     const connection: Connection = await createConnection({ auth })
@@ -171,21 +172,15 @@ async function fetchHomeAssistantData(): Promise<HomeAssistantData> {
         dashboards = [...new Set(dashboards)]
       }
     } catch (err) {
-      console.warn(
-        'Could not parse dashboards, using defaults:',
-        (err as Error).message
-      )
+      log.warn`Could not parse dashboards, using defaults: ${(err as Error).message}`
     }
 
     return { themes: themesResult, network: networkResult, config, dashboards }
   } catch (err) {
-    console.error(
-      'Error fetching Home Assistant data:',
-      (err as Error).message || err
-    )
+    log.error`Error fetching HA data: ${(err as Error).message || err}`
     const error = err as Error & { code?: string; cause?: unknown }
-    if (error.code) console.error(`[DEBUG] Error code: ${error.code}`)
-    if (error.cause) console.error(`[DEBUG] Error cause:`, error.cause)
+    if (error.code) log.debug`Error code: ${error.code}`
+    if (error.cause) log.debug`Error cause: ${error.cause}`
     return { themes: null, network: null, config: null, dashboards: null }
   }
 }
@@ -264,7 +259,7 @@ export async function handleUIRequest(response: ServerResponse): Promise<void> {
 
     sendHtmlResponse(response, html)
   } catch (err) {
-    console.error('Error serving UI:', err)
+    log.error`Error serving UI: ${err}`
     response.statusCode = 500
     response.end('Error loading UI')
   }

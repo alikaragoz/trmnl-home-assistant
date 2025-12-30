@@ -13,7 +13,6 @@ import {
   buildParams,
 } from './services.js'
 import {
-  SCHEDULER_LOG_PREFIX,
   SCHEDULER_MAX_RETRIES,
   SCHEDULER_RETRY_DELAY_MS,
   SCHEDULER_RETENTION_MULTIPLIER,
@@ -22,6 +21,9 @@ import {
 } from '../../const.js'
 import { loadSchedules } from '../scheduleStore.js'
 import type { Schedule, ScreenshotParams } from '../../types/domain.js'
+import { schedulerLogger } from '../logger.js'
+
+const log = schedulerLogger()
 
 /** Function type for screenshot capture */
 export type ScreenshotFunction = (params: ScreenshotParams) => Promise<Buffer>
@@ -47,11 +49,11 @@ export class ScheduleExecutor {
   /** Executes schedule with automatic retry on network failures */
   async call(schedule: Schedule): Promise<ExecutionResult> {
     const startTime = Date.now()
-    console.log(`${SCHEDULER_LOG_PREFIX} Running: ${schedule.name}`)
+    log.info`Running: ${schedule.name}`
 
     const result = await this.#executeWithRetry(schedule)
 
-    console.log(`${SCHEDULER_LOG_PREFIX} Completed: ${schedule.name} in ${Date.now() - startTime}ms`)
+    log.info`Completed: ${schedule.name} in ${Date.now() - startTime}ms`
     return result
   }
 
@@ -86,7 +88,7 @@ export class ScheduleExecutor {
       imageBuffer,
       format: format as 'png' | 'jpeg' | 'bmp',
     })
-    console.log(`${SCHEDULER_LOG_PREFIX} Saved: ${outputPath}`)
+    log.info`Saved: ${outputPath}`
 
     const schedules = await loadSchedules()
     const maxFiles = schedules.filter((s) => s.enabled).length * SCHEDULER_RETENTION_MULTIPLIER
@@ -96,7 +98,7 @@ export class ScheduleExecutor {
       filePattern: SCHEDULER_IMAGE_FILE_PATTERN,
     })
 
-    if (deletedCount > 0) console.log(`${SCHEDULER_LOG_PREFIX} Cleanup: Deleted ${deletedCount} old file(s)`)
+    if (deletedCount > 0) log.debug`Cleanup: Deleted ${deletedCount} old file(s)`
     return outputPath
   }
 
@@ -104,7 +106,6 @@ export class ScheduleExecutor {
   async #uploadIfConfigured(schedule: Schedule, imageBuffer: Buffer, format: string): Promise<void> {
     if (!schedule.webhook_url) return
 
-    console.log(`${SCHEDULER_LOG_PREFIX} Webhook URL: ${schedule.webhook_url}`)
     try {
       await uploadToWebhook({
         webhookUrl: schedule.webhook_url,
@@ -113,7 +114,8 @@ export class ScheduleExecutor {
         format: format as 'png' | 'jpeg' | 'bmp',
       })
     } catch (err) {
-      console.error(`${SCHEDULER_LOG_PREFIX} Webhook upload failed:`, (err as Error).message)
+      // Error already logged by uploadToWebhook, just re-log for schedule context
+      log.error`Schedule "${schedule.name}" webhook failed: ${(err as Error).message}`
     }
   }
 
@@ -122,8 +124,8 @@ export class ScheduleExecutor {
   }
 
   #logRetry(name: string, err: Error, attempt: number): void {
-    console.error(`${SCHEDULER_LOG_PREFIX} Network error on attempt ${attempt}/${SCHEDULER_MAX_RETRIES} for ${name}: ${err.message}`)
-    console.log(`${SCHEDULER_LOG_PREFIX} Retrying in ${SCHEDULER_RETRY_DELAY_MS / 1000}s...`)
+    log.warn`Network error (${attempt}/${SCHEDULER_MAX_RETRIES}) for ${name}: ${err.message}`
+    log.info`Retrying in ${SCHEDULER_RETRY_DELAY_MS / 1000}s...`
   }
 
   #delay(ms: number): Promise<void> {

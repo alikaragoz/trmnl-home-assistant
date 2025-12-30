@@ -17,8 +17,10 @@
 
 import cron from 'node-cron'
 import type { ScheduledTask } from 'node-cron'
-import { SCHEDULER_LOG_PREFIX } from '../../const.js'
 import type { Schedule } from '../../types/domain.js'
+import { cronLogger } from '../logger.js'
+
+const log = cronLogger()
 
 /** Extended scheduled task with attached cron expression metadata */
 interface ExtendedScheduledTask extends ScheduledTask {
@@ -46,11 +48,12 @@ export class CronJobManager {
    * @param callback - Function to execute when cron fires
    * @returns True if job was created/updated, false if validation failed
    */
-  upsertJob(schedule: Pick<Schedule, 'id' | 'name' | 'cron'>, callback: () => void): boolean {
+  upsertJob(
+    schedule: Pick<Schedule, 'id' | 'name' | 'cron'>,
+    callback: () => void
+  ): boolean {
     if (!cron.validate(schedule.cron)) {
-      console.error(
-        `${SCHEDULER_LOG_PREFIX} Invalid cron expression for ${schedule.name}: ${schedule.cron}`
-      )
+      log.error`Invalid cron expression for ${schedule.name}: ${schedule.cron}`
       return false
     }
 
@@ -65,9 +68,7 @@ export class CronJobManager {
     job.cronExpression = schedule.cron
     this.#jobs.set(schedule.id, job)
 
-    console.log(
-      `${SCHEDULER_LOG_PREFIX} Scheduled: ${schedule.name} (${schedule.cron})`
-    )
+    log.info`Scheduled: ${schedule.name} (${schedule.cron})`
 
     return true
   }
@@ -85,7 +86,7 @@ export class CronJobManager {
       job.stop()
       this.#jobs.delete(id)
       const logName = name ? name : id
-      console.log(`${SCHEDULER_LOG_PREFIX} Stopped job: ${logName}`)
+      log.info`Stopped job: ${logName}`
       return true
     }
     return false
@@ -103,9 +104,7 @@ export class CronJobManager {
       if (!activeIds.has(id)) {
         job.stop()
         this.#jobs.delete(id)
-        console.log(
-          `${SCHEDULER_LOG_PREFIX} Removed deleted schedule job: ${id}`
-        )
+        log.info`Removed deleted schedule job: ${id}`
         prunedCount++
       }
     }

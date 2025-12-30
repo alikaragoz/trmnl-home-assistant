@@ -15,6 +15,9 @@ import {
 } from '../../const.js'
 import { CannotOpenPageError } from '../../error.js'
 import type { NavigationResult } from '../../types/domain.js'
+import { navigationLogger } from '../logger.js'
+
+const log = navigationLogger()
 
 /** Auth storage for localStorage injection */
 export type AuthStorage = Record<string, string>
@@ -163,7 +166,7 @@ export class WaitForPageLoad {
         { timeout: 10000, polling: 100 }
       )
     } catch (_err) {
-      console.log('Timeout waiting for HA to finish loading')
+      log.debug`Timeout waiting for HA to finish loading`
     }
   }
 }
@@ -215,9 +218,7 @@ export class WaitForPageStable {
         stableChecks++
         if (stableChecks >= requiredStableChecks) {
           const actualWait = Date.now() - start
-          console.debug(
-            `Page stable after ${actualWait}ms (${stableChecks} checks)`
-          )
+          log.debug`Page stable after ${actualWait}ms (${stableChecks} checks)`
           return actualWait
         }
       } else {
@@ -231,7 +232,7 @@ export class WaitForPageStable {
     }
 
     const actualWait = Date.now() - start
-    console.debug(`Page stability timeout after ${actualWait}ms`)
+    log.debug`Page stability timeout after ${actualWait}ms`
     return actualWait
   }
 }

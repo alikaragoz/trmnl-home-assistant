@@ -35,6 +35,12 @@ import { BrowserFacade } from './lib/browserFacade.js'
 import { HttpRouter } from './lib/http-router.js'
 import { ScreenshotParamsParser } from './lib/screenshot-params-parser.js'
 import type { ScreenshotParams, ImageFormat } from './types/domain.js'
+import { initializeLogging, appLogger, browserLogger } from './lib/logger.js'
+
+// Initialize logging before anything else
+await initializeLogging()
+const log = appLogger()
+const browserLog = browserLogger()
 
 /** Pending request resolver function */
 type PendingResolver = () => void
@@ -119,11 +125,7 @@ class RequestHandler {
     this.#requestCount++
 
     if (this.#requestCount >= MAX_SCREENSHOTS_BEFORE_RESTART) {
-      console.log(
-        `[Cleanup] Proactive browser cleanup after ${
-          this.#requestCount
-        } successful screenshots`
-      )
+      browserLog.info`Proactive cleanup after ${this.#requestCount} screenshots`
       await this.#browser.cleanup()
       this.#requestCount = 0
     }
@@ -140,7 +142,7 @@ class RequestHandler {
     const health = this.#facade.checkHealth()
 
     if (!health.healthy) {
-      console.warn(`[Health] Browser unhealthy: ${health.reason}`)
+      browserLog.warn`Browser unhealthy: ${health.reason}`
       await this.#facade.recover()
     }
   }
@@ -156,10 +158,7 @@ class RequestHandler {
 
     if (!isBrowserError) return false
 
-    console.error(
-      requestId,
-      `Browser error detected: ${err.name} - ${err.message}`
-    )
+    browserLog.error`[${requestId}] Browser error: ${err.name} - ${err.message}`
 
     const shouldRecover = this.#facade.recordFailure()
 
@@ -169,14 +168,8 @@ class RequestHandler {
         return true
       } catch (recoveryErr) {
         if (recoveryErr instanceof BrowserRecoveryFailedError) {
-          console.error(
-            requestId,
-            'CRITICAL: Browser recovery failed completely!'
-          )
-          console.error(
-            requestId,
-            'Server will continue but browser features unavailable'
-          )
+          browserLog.fatal`[${requestId}] CRITICAL: Browser recovery failed!`
+          browserLog.error`[${requestId}] Server continues but browser unavailable`
         }
         throw recoveryErr
       }
@@ -219,11 +212,16 @@ class RequestHandler {
       const params = this.#paramsParser.call(requestUrl)
       if (!params) return this.#sendError(response, 400, 'Invalid parameters')
 
+      log.info`Screenshot request: ${params.pagePath} (${params.viewport.width}x${params.viewport.height})`
+
       const navTime = await this.#navigateWithRecovery(params, requestId, response)
       if (navTime === null) return
 
       const image = await this.#captureWithRecovery(params, requestId, response)
       if (!image) return
+
+      const elapsed = Date.now() - start.getTime()
+      log.info`Screenshot complete: ${image.length} bytes in ${elapsed}ms`
 
       this.#sendImage(response, image, params.format)
       if (params.next) this.#scheduleNextRequest(requestId, params, start)
@@ -235,9 +233,9 @@ class RequestHandler {
   /** Waits in queue if handler is busy */
   async #waitForQueue(requestId: number, start: Date): Promise<void> {
     if (!this.#busy) return
-    console.log(requestId, 'Busy, waiting in queue')
+    log.debug`[${requestId}] Busy, waiting in queue`
     await new Promise<void>((resolve) => this.#pending.push(resolve))
-    console.log(requestId, `Wait time: ${Date.now() - start.getTime()} ms`)
+    log.debug`[${requestId}] Wait time: ${Date.now() - start.getTime()}ms`
   }
 
   /** Releases queue lock and processes next request */
@@ -288,13 +286,13 @@ class RequestHandler {
     requestId: number,
     response: ServerResponse
   ): Promise<number | null> {
-    console.log(requestId, 'Retrying navigation after recovery...')
+    browserLog.info`[${requestId}] Retrying navigation after recovery...`
     try {
       const result = await this.#browser.navigatePage(params)
       this.#facade.recordSuccess()
       return result.time
     } catch (retryErr) {
-      console.error(requestId, 'Retry failed after recovery:', retryErr)
+      browserLog.error`[${requestId}] Retry failed: ${retryErr}`
       this.#sendError(response, 503, 'Service temporarily unavailable')
       return null
     }
@@ -366,7 +364,7 @@ class RequestHandler {
 
     if (nextWaitTime < 0) return
 
-    console.debug(requestId, `Next request in ${nextWaitTime} ms`)
+    log.debug`[${requestId}] Next request in ${nextWaitTime}ms`
     this.#nextRequests.push(
       setTimeout(
         () => this.#prepareNextRequest(requestId, params),
@@ -384,22 +382,22 @@ class RequestHandler {
    */
   async #prepareNextRequest(requestId: number, params: ScreenshotParams): Promise<void> {
     if (this.#busy) {
-      console.log('Busy, skipping next request')
+      log.debug`Busy, skipping next request`
       return
     }
 
     const nextRequestId = `${requestId}-next`
     this.#busy = true
-    console.log(nextRequestId, 'Preparing next request')
+    log.debug`[${nextRequestId}] Preparing next request`
 
     try {
       const navigateResult = await this.#browser.navigatePage({
         ...params,
         extraWait: 0,
       } as NavigateParams)
-      console.debug(nextRequestId, `Navigated in ${navigateResult.time} ms`)
+      log.debug`[${nextRequestId}] Navigated in ${navigateResult.time}ms`
     } catch (err) {
-      console.error(nextRequestId, 'Error preparing next request', err)
+      log.error`[${nextRequestId}] Error preparing next request: ${err}`
     } finally {
       this.#busy = false
       const resolve = this.#pending.shift()
@@ -466,12 +464,11 @@ server.listen(port)
 
 scheduler.start()
 
-const now = new Date()
 const serverUrl = isAddOn
   ? `http://homeassistant.local:${port}`
   : `http://localhost:${port}`
-console.log(`[${now.toLocaleTimeString()}] Visit server at ${serverUrl}`)
-console.log(`[${now.toLocaleTimeString()}] Scheduler is running`)
+log.info`Server started at ${serverUrl}`
+log.info`Scheduler is running`
 
 // =============================================================================
 // SIMPLE RESILIENCE FEATURES
@@ -490,12 +487,10 @@ function startMemoryMonitor(): void {
     const rssMB = (rss / 1024 / 1024).toFixed(2)
 
     if (rss > EXIT_THRESHOLD) {
-      console.error(
-        `[Memory] CRITICAL: ${rssMB}MB / 1024MB - Exiting for restart`
-      )
+      log.fatal`CRITICAL: Memory ${rssMB}MB / 1024MB - exiting for restart`
       process.exit(1)
     } else if (rss > WARN_THRESHOLD) {
-      console.warn(`[Memory] WARNING: ${rssMB}MB / 1024MB`)
+      log.warn`Memory warning: ${rssMB}MB / 1024MB`
     }
   }, 30000)
 }
@@ -531,9 +526,7 @@ async function startLogRotation(): Promise<void> {
 
         try {
           renameSync(logPath, rotatedPath)
-          console.log(
-            `[LogRotate] Rotated ${logFile} (${(stats.size / 1024 / 1024).toFixed(2)}MB)`
-          )
+          log.info`Log rotated: ${logFile} (${(stats.size / 1024 / 1024).toFixed(2)}MB)`
 
           const allFiles = readdirSync(LOG_DIR)
           const rotatedFiles = allFiles
@@ -548,16 +541,14 @@ async function startLogRotation(): Promise<void> {
             rotatedFiles.slice(MAX_FILES).forEach((f) => {
               try {
                 unlinkSync(path.join(LOG_DIR, f.name))
-                console.log(`[LogRotate] Deleted old log: ${f.name}`)
+                log.debug`Deleted old log: ${f.name}`
               } catch (err) {
-                console.error(
-                  `[LogRotate] Error deleting ${f.name}: ${(err as Error).message}`
-                )
+                log.error`Error deleting ${f.name}: ${(err as Error).message}`
               }
             })
           }
         } catch (err) {
-          console.error(`[LogRotate] Error rotating ${logFile}: ${(err as Error).message}`)
+          log.error`Error rotating ${logFile}: ${(err as Error).message}`
         }
       }
     }
@@ -593,23 +584,19 @@ function isBrowserRelatedError(error: unknown): boolean {
  * Graceful shutdown handler for SIGTERM and SIGINT signals.
  */
 async function gracefulShutdown(signal: string): Promise<void> {
-  console.log(
-    `\n[${new Date().toLocaleTimeString()}] ${signal} received, shutting down gracefully...`
-  )
+  log.info`${signal} received, shutting down gracefully...`
 
   scheduler.stop()
 
   server.close(async () => {
-    console.log(`[${new Date().toLocaleTimeString()}] HTTP server closed`)
+    log.info`HTTP server closed`
     await browser.cleanup()
-    console.log(`[${new Date().toLocaleTimeString()}] Browser cleaned up`)
+    log.info`Browser cleaned up`
     process.exit(0)
   })
 
   setTimeout(() => {
-    console.error(
-      `[${new Date().toLocaleTimeString()}] Forced shutdown after timeout`
-    )
+    log.error`Forced shutdown after timeout`
     process.exit(1)
   }, 30000)
 }
@@ -618,31 +605,22 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
 process.on('SIGINT', () => gracefulShutdown('SIGINT'))
 
 process.on('uncaughtException', async (err: Error) => {
-  console.error(`[${new Date().toLocaleTimeString()}] Uncaught Exception:`, err)
+  log.fatal`Uncaught Exception: ${err}`
 
   if (isBrowserRelatedError(err)) {
-    console.error(
-      '[Process] Browser-related crash detected, allowing container restart...'
-    )
+    log.error`Browser-related crash, allowing container restart...`
   }
 
   process.exit(1)
 })
 
-process.on('unhandledRejection', async (reason: unknown, promise: Promise<unknown>) => {
-  console.error(
-    `[${new Date().toLocaleTimeString()}] Unhandled Rejection at:`,
-    promise,
-    'reason:',
-    reason
-  )
+process.on('unhandledRejection', async (reason: unknown, _promise: Promise<unknown>) => {
+  log.error`Unhandled Rejection: ${reason}`
 
   if (isBrowserRelatedError(reason)) {
-    console.error(
-      '[Process] Browser-related rejection detected, allowing container restart...'
-    )
+    log.error`Browser-related rejection, allowing container restart...`
     process.exit(1)
   }
 
-  console.warn('[Process] Non-browser rejection logged, continuing...')
+  log.warn`Non-browser rejection logged, continuing...`
 })

@@ -186,7 +186,7 @@ For best e-ink results:
 - Tokens are passed to the browser in memory, not written to disk
 - Use a dedicated token for this add-on (revoke it to disable access)
 
-### AppArmor Profile
+### AppArmor Profile (TODO)
 
 The add-on includes an AppArmor security profile that:
 

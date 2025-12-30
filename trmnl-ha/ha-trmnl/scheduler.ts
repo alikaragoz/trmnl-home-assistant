@@ -23,12 +23,11 @@ import { fileURLToPath } from 'node:url'
 import { loadSchedules } from './lib/scheduleStore.js'
 import { ScheduleExecutor, type ScreenshotFunction, type ExecutionResult } from './lib/scheduler/schedule-executor.js'
 import { CronJobManager } from './lib/scheduler/cron-job-manager.js'
-import {
-  SCHEDULER_LOG_PREFIX,
-  SCHEDULER_RELOAD_INTERVAL_MS,
-  SCHEDULER_OUTPUT_DIR_NAME,
-} from './const.js'
+import { SCHEDULER_RELOAD_INTERVAL_MS, SCHEDULER_OUTPUT_DIR_NAME } from './const.js'
 import type { Schedule } from './types/domain.js'
+import { schedulerLogger } from './lib/logger.js'
+
+const log = schedulerLogger()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -61,7 +60,7 @@ export class Scheduler {
    * Starts the scheduler with immediate load and periodic reload.
    */
   start(): void {
-    console.log(`${SCHEDULER_LOG_PREFIX} Starting scheduler...`)
+    log.info`Starting scheduler...`
     // Fire-and-forget initial load (errors logged by loadAndSchedule)
     void this.#loadAndSchedule()
 
@@ -75,7 +74,7 @@ export class Scheduler {
    * Stops the scheduler and cleans up all cron jobs.
    */
   stop(): void {
-    console.log(`${SCHEDULER_LOG_PREFIX} Stopping scheduler...`)
+    log.info`Stopping scheduler...`
     clearInterval(this.#reloadInterval)
     this.#cronManager.stopAll()
   }
@@ -95,9 +94,7 @@ export class Scheduler {
       throw new Error(`Schedule not found: ${scheduleId}`)
     }
 
-    console.log(
-      `${SCHEDULER_LOG_PREFIX} Manual execution requested: ${schedule.name}`
-    )
+    log.info`Manual execution: ${schedule.name}`
 
     return await this.#executor.call(schedule)
   }
@@ -108,23 +105,20 @@ export class Scheduler {
   async #loadAndSchedule(): Promise<void> {
     const schedules = await loadSchedules()
     const activeIds = new Set<string>()
+    const enabledSchedules = schedules.filter((s) => s.enabled)
 
-    console.log(
-      `${SCHEDULER_LOG_PREFIX} Loaded ${schedules.length} schedule(s)`
-    )
+    log.info`Loaded ${schedules.length} schedule(s), ${enabledSchedules.length} enabled`
 
     for (const schedule of schedules) {
-      console.log(
-        `${SCHEDULER_LOG_PREFIX} Schedule: ${schedule.name}, enabled: ${
-          schedule.enabled
-        }, cron: ${schedule.cron}, webhook: ${schedule.webhook_url || 'none'}`
-      )
-
       if (!schedule.enabled) {
-        // Remove job if disabled
+        log.debug`Schedule "${schedule.name}" is disabled`
         this.#cronManager.removeJob(schedule.id, schedule.name)
         continue
       }
+
+      // Log active schedules at info level for visibility
+      const webhookStatus = schedule.webhook_url ? '→ webhook' : '→ file only'
+      log.info`  • ${schedule.name} [${schedule.cron}] ${webhookStatus}`
 
       activeIds.add(schedule.id)
 
@@ -142,10 +136,11 @@ export class Scheduler {
    * Executes a schedule via delegation to ScheduleExecutor (cron callback).
    */
   async #runSchedule(schedule: Schedule): Promise<void> {
+    log.info`Cron triggered: ${schedule.name}`
     try {
       await this.#executor.call(schedule)
-    } catch (_err) {
-      // Already logged by executor
+    } catch (err) {
+      log.error`Schedule "${schedule.name}" failed: ${(err as Error).message}`
     }
   }
 }

@@ -12,6 +12,9 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Schedule, ScheduleInput, ScheduleUpdate } from '../types/domain.js'
+import { schedulerLogger } from './logger.js'
+
+const log = schedulerLogger()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -82,7 +85,7 @@ export async function loadSchedules(
       return JSON.parse(data) as Schedule[]
     }
   } catch (err) {
-    console.error('Error loading schedules:', err)
+    log.error`Error loading schedules: ${err}`
   }
   return []
 }
@@ -109,7 +112,7 @@ export async function saveSchedules(
   try {
     await fs.writeFile(filePath, JSON.stringify(data, null, 2))
   } catch (err) {
-    console.error('Error saving schedules:', err)
+    log.error`Error saving schedules: ${err}`
     throw err
   }
 }

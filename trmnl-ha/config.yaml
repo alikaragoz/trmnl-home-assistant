@@ -34,12 +34,14 @@ options:
   access_token: ""
   home_assistant_url: "http://homeassistant:8123"
   keep_browser_open: false
+  debug_logging: false
 
 # Schema for options validation
 schema:
   access_token: str
   home_assistant_url: str?
   keep_browser_open: bool?
+  debug_logging: bool?
 
 # Exclude regeneratable data from HA backups
 backup_exclude:

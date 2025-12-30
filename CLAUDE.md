@@ -67,6 +67,7 @@ HTTP Request → HttpRouter → RequestHandler → Browser (Puppeteer)
 | `lib/http-router.ts` | HTTP routing for UI, API, health, static files |
 | `lib/dithering.ts` | Image processing pipeline via GraphicsMagick |
 | `lib/scheduleStore.ts` | Schedule CRUD operations with JSON persistence |
+| `lib/logger.ts` | LogTape-based structured logging with module categories |
 | `const.ts` | All configuration constants, environment detection |
 | `error.ts` | Custom error classes for browser lifecycle management |
 
@@ -133,10 +134,44 @@ bun run mock:server
 MOCK_HA=true bun run dev
 ```
 
+## Logging
+
+Uses [LogTape](https://logtape.org) for structured, timestamped logging with zero dependencies.
+
+### Log Format
+```
+[2025-12-30T11:19:53.454Z] [INFO ] [scheduler] Starting scheduler...
+[2025-12-30T11:19:53.454Z] [INFO ] [app] Server started at http://localhost:10000
+```
+
+### Usage
+```typescript
+import { appLogger, browserLogger, schedulerLogger } from './lib/logger.js'
+
+const log = appLogger()
+log.info`Server started at ${url}`
+log.debug`Processing ${count} items`
+log.error`Failed: ${error.message}`
+```
+
+### Available Loggers
+- `appLogger()` - Main app lifecycle
+- `browserLogger()` - Puppeteer/browser operations
+- `screenshotLogger()` - Screenshot capture
+- `schedulerLogger()` - Cron scheduling
+- `cronLogger()` - Cron job management
+- `webhookLogger()` - Webhook delivery
+- `httpLogger()` - HTTP routing
+- `uiLogger()` - UI serving
+- `ditheringLogger()` - Image processing
+- `navigationLogger()` - Page navigation
+- `configLogger()` - Configuration loading
+
 ## Environment Variables
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
+| `LOG_LEVEL` | `info` | Log verbosity: trace, debug, info, warning, error, fatal |
 | `MOCK_HA` | `false` | Use mock HA server for testing |
 | `BROWSER_TIMEOUT` | `60000` | Idle timeout before browser cleanup (ms) |
 | `MAX_SCREENSHOTS_BEFORE_RESTART` | `100` | Proactive browser restart threshold |

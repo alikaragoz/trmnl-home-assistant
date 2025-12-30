@@ -18,7 +18,7 @@
 
 import puppeteer from 'puppeteer'
 import type { Browser as PuppeteerBrowser, Page, Viewport } from 'puppeteer'
-import { debug, isAddOn, chromiumExecutable, HEADER_HEIGHT } from './const.js'
+import { debugLogging, isAddOn, chromiumExecutable, HEADER_HEIGHT } from './const.js'
 import {
   CannotOpenPageError,
   BrowserCrashError,
@@ -41,6 +41,10 @@ import type {
   RotationAngle,
   DitheringConfig,
 } from './types/domain.js'
+import { screenshotLogger, browserLogger } from './lib/logger.js'
+
+const log = screenshotLogger()
+const browserLog = browserLogger()
 
 // =============================================================================
 // BROWSER CONFIGURATION
@@ -223,16 +227,16 @@ export class Browser {
     try {
       if (page) await page.close()
     } catch (err) {
-      console.error('Error closing page during cleanup:', err)
+      browserLog.error`Error closing page during cleanup: ${err}`
     }
 
     try {
       if (browser) await browser.close()
     } catch (err) {
-      console.error('Error closing browser during cleanup:', err)
+      browserLog.error`Error closing browser during cleanup: ${err}`
     }
 
-    console.log('Closed browser')
+    browserLog.info`Browser closed`
   }
 
   /**
@@ -241,7 +245,7 @@ export class Browser {
   async #getPage(): Promise<Page> {
     if (this.#page) return this.#page
 
-    console.log('Starting browser')
+    browserLog.info`Starting browser`
 
     try {
       // Launch browser
@@ -253,7 +257,7 @@ export class Browser {
 
       // Monitor browser process death
       browser.on('disconnected', () => {
-        console.error('[Browser] Browser process disconnected!')
+        browserLog.error`Browser process disconnected!`
         this.#browser = undefined
         this.#page = undefined
       })
@@ -276,19 +280,14 @@ export class Browser {
    */
   #setupPageLogging(page: Page): void {
     page
-      .on('framenavigated', (frame) =>
-        { console.log('Frame navigated', frame.url()); }
-      )
-      .on('console', (message) =>
-        { console.log(
-          `CONSOLE ${message
-            .type()
-            .slice(0, 3)
-            .toUpperCase()} ${message.text()}`
-        ); }
-      )
+      .on('framenavigated', (frame) => {
+        browserLog.trace`Frame navigated: ${frame.url()}`
+      })
+      .on('console', (message) => {
+        browserLog.trace`CONSOLE ${message.type().slice(0, 3).toUpperCase()} ${message.text()}`
+      })
       .on('error', (err) => {
-        console.error('ERROR', err)
+        browserLog.error`Page error: ${err}`
         this.#pageErrorDetected = true
       })
       .on('pageerror', (error) => {
@@ -301,22 +300,18 @@ export class Browser {
           return
         }
 
-        console.log('PAGE ERROR', message)
+        browserLog.warn`Page error: ${message}`
         this.#pageErrorDetected = true
       })
-      .on('requestfailed', (request) =>
-        { console.log(
-          `REQUEST-FAILED ${request.failure()?.errorText} ${request.url()}`
-        ); }
-      )
+      .on('requestfailed', (request) => {
+        browserLog.debug`Request failed: ${request.failure()?.errorText} ${request.url()}`
+      })
 
     // Verbose response logging in debug mode
-    if (debug) {
-      page.on('response', (response) =>
-        { console.log(
-          `RESPONSE ${response.status()} ${response.url()} (cache: ${response.fromCache()})`
-        ); }
-      )
+    if (debugLogging) {
+      page.on('response', (response) => {
+        browserLog.trace`Response: ${response.status()} ${response.url()} (cache: ${response.fromCache()})`
+      })
     }
   }
 
@@ -433,13 +428,13 @@ export class Browser {
 
       // Apply smart wait strategy
       if (extraWait !== undefined && extraWait !== null && extraWait > 0) {
-        console.debug(`Explicit wait: ${extraWait}ms`)
+        log.debug`Explicit wait: ${extraWait}ms`
         await new Promise((resolve) => setTimeout(resolve, extraWait))
       } else {
         const maxWait = waitTime > 0 ? waitTime : 3000
         const waitStableCmd = new WaitForPageStable(page, maxWait)
         const actualWait = await waitStableCmd.call()
-        console.debug(`Smart wait: ${actualWait}ms (max: ${maxWait}ms)`)
+        log.debug`Smart wait: ${actualWait}ms (max: ${maxWait}ms)`
       }
 
       return { time: Date.now() - start }
@@ -521,7 +516,7 @@ export class Browser {
         invert,
         dithering,
       })
-      console.debug(`Image processing took ${Date.now() - startProcess}ms`)
+      log.debug`Image processing took ${Date.now() - startProcess}ms`
 
       return { image, time: Date.now() - start }
     } catch (err) {

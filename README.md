@@ -42,8 +42,6 @@ If running Home Assistant OS in Proxmox, set the VM host type to `host` for Chro
 - **Never expose port 10000** directly to the internet
 - Access tokens are stored securely in Home Assistant's add-on configuration
 
-The add-on includes an AppArmor security profile that restricts file and network access to only what's required for operation.
-
 ## Documentation
 
 | Topic | Description |

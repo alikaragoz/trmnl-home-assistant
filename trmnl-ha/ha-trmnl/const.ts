@@ -21,6 +21,7 @@ interface Options {
   access_token?: string
   chromium_executable?: string
   keep_browser_open?: boolean
+  debug_logging?: boolean
 }
 
 /**
@@ -108,9 +109,10 @@ export const chromiumExecutable: string = isAddOn
 export const keepBrowserOpen: boolean = options.keep_browser_open ?? false
 
 /**
- * Enable debug logging
+ * Enable debug logging (from HA add-on configuration)
+ * When true, sets log level to 'debug' for verbose output
  */
-export const debug: boolean = false
+export const debugLogging: boolean = options.debug_logging ?? false
 
 // =============================================================================
 // SERVER CONFIGURATION
@@ -227,11 +229,6 @@ export const CONTENT_TYPES: ContentTypeMap = {
 // =============================================================================
 // SCHEDULER CONFIGURATION
 // =============================================================================
-
-/**
- * Scheduler log prefix for console output
- */
-export const SCHEDULER_LOG_PREFIX: string = '[Scheduler]'
 
 /**
  * Schedule reload interval in milliseconds

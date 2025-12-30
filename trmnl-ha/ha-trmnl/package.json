@@ -32,6 +32,7 @@
     "release:dry": "bun ../../scripts/release.js patch --dry-run"
   },
   "dependencies": {
+    "@logtape/logtape": "^1.3.5",
     "gm": "^1.25.1",
     "home-assistant-js-websocket": "^9.6.0",
     "node-cron": "^4.2.1",
