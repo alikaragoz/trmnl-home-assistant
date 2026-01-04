@@ -160,6 +160,10 @@ http://localhost:10000/?url=https://status.github.com&viewport=800x480
 | `dithering` | No | flag | Enable advanced dithering for e-ink |
 | `dither_method` | No | `floyd-steinberg`, `ordered`, `none` | Dithering algorithm (default: `floyd-steinberg`) |
 | `palette` | No | `bw`, `gray-4`, `gray-16`, `gray-256` | Color palette for dithering |
+| `compression_level` | No | `1-9` | PNG compression level (default: `9`, max compression) |
+| `levels_enabled` | No | flag | Enable manual black/white level adjustments |
+| `black_level` | No | `0-100` | Black point (requires `levels_enabled`) |
+| `white_level` | No | `0-100` | White point (requires `levels_enabled`) |
 | `format` | No | `png`, `jpeg`, `bmp` | Output format (default: `png`) |
 | `rotate` | No | `90`, `180`, `270` | Rotation in degrees |
 | `theme` | No | string | Home Assistant theme name (HA mode only) |
@@ -256,6 +260,16 @@ For best e-ink results:
 1. Verify the access token is valid and not expired
 2. Check that the dashboard path is correct
 3. Increase the `wait` parameter if the dashboard has many dynamic elements
+
+### HA Connection Issues
+
+When Home Assistant is not connected, the Web UI displays a diagnostic banner showing:
+
+- **Status**: Why the connection failed (e.g., "Network error", "401 Unauthorized")
+- **URL**: The configured Home Assistant URL
+- **Token**: First 4 characters of your token (masked) for verification
+
+If the connection data seems stale, add `?refresh=1` to the URL to force a fresh connection attempt.
 
 ## Security Considerations
 

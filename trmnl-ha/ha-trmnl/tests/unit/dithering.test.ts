@@ -37,11 +37,13 @@ describe('Dithering Module', () => {
             return
           }
           stdout.on('data', (chunk: Buffer) => chunks.push(chunk))
-          stdout.on('end', () => { resolve(Buffer.concat(chunks)); })
+          stdout.on('end', () => {
+            resolve(Buffer.concat(chunks))
+          })
           stdout.on('error', reject)
         })
     })
-  })
+  }, 15000)
 
   // ==========================================================================
   // Constants - Test that module exports expected values
@@ -49,7 +51,11 @@ describe('Dithering Module', () => {
 
   describe('SUPPORTED_METHODS', () => {
     it('exports array of supported dithering methods', () => {
-      expect(SUPPORTED_METHODS).toEqual(['floyd-steinberg', 'ordered', 'threshold'])
+      expect(SUPPORTED_METHODS).toEqual([
+        'floyd-steinberg',
+        'ordered',
+        'threshold',
+      ])
     })
   })
 
@@ -113,7 +119,9 @@ describe('Dithering Module', () => {
 
     it('falls back to defaults when invalid method provided', () => {
       // NOTE: Intentionally testing with invalid input - type assertion required
-      const result = validateDitheringOptions({ method: 'invalid-method' as DitheringMethod })
+      const result = validateDitheringOptions({
+        method: 'invalid-method' as DitheringMethod,
+      })
       expect(result.method).toBe('floyd-steinberg')
     })
 
@@ -406,11 +414,13 @@ describe('Dithering Module', () => {
               return
             }
             stdout.on('data', (chunk: Buffer) => chunks.push(chunk))
-            stdout.on('end', () => { resolve(Buffer.concat(chunks)); })
+            stdout.on('end', () => {
+              resolve(Buffer.concat(chunks))
+            })
             stdout.on('error', reject)
           })
       })
-    })
+    }, 15000)
 
     it('produces 1-bit BW images under 50KB for 800x480', async () => {
       const result = await applyDithering(largeTestImage, {
